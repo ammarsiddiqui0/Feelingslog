@@ -1,23 +1,33 @@
 package com.example.feelingslog
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
 import androidx.compose.foundation.lazy.staggeredgrid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreen() {
+fun HomeScreen(
+    onLogClick: (String) -> Unit,
+    onAddLogClick: () -> Unit,
+    viewModel: LogViewModel = viewModel()
+) {
+    val logs by viewModel.logs.collectAsState()
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -27,6 +37,11 @@ fun HomeScreen() {
                     titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
                 )
             )
+        },
+        floatingActionButton = {
+            FloatingActionButton(onClick = onAddLogClick) {
+                Icon(Icons.Default.Add, contentDescription = "Add Log")
+            }
         }
     ) { innerPadding ->
         // Masonry Grid
@@ -39,21 +54,26 @@ fun HomeScreen() {
             verticalItemSpacing = 12.dp,
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            items(sampleLogs) { log ->
-                FeelingLogCard(log)
+            items(logs) { log ->
+                FeelingLogCard(
+                    log = log,
+                    onClick = { onLogClick(log.id) }
+                )
             }
         }
     }
 }
 
 @Composable
-fun FeelingLogCard(log: FeelingLog) {
+fun FeelingLogCard(log: FeelingLog, onClick: () -> Unit) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
-            // Image Placeholder (similar to a <div> with a background color)
+            // Image Placeholder
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -70,8 +90,11 @@ fun FeelingLogCard(log: FeelingLog) {
                 fontWeight = FontWeight.Bold
             )
             
+            // Extract preview text from blocks
+            val previewText = (log.blocks.firstOrNull { it is LogContentBlock.Text } as? LogContentBlock.Text)?.text ?: ""
+            
             Text(
-                text = log.description,
+                text = previewText,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 2
