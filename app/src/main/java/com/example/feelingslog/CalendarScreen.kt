@@ -1,6 +1,7 @@
 package com.example.feelingslog
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -10,6 +11,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -29,7 +31,8 @@ fun CalendarScreen(
     onLogClick: (String) -> Unit,
     viewModel: LogViewModel = viewModel()
 ) {
-    val logs by viewModel.logs.collectAsState()
+    // Consume calendarLogs to include both active and soft-deleted logs
+    val logs by viewModel.calendarLogs.collectAsState()
 
     // Map logs by date key "YYYY-MM-DD"
     val logsByDate = remember(logs) {
@@ -156,7 +159,6 @@ fun CalendarScreen(
                     set(Calendar.MONTH, currentMonth)
                 }
             }
-            // Calendar.DAY_OF_WEEK returns 1 for Sunday, 2 for Monday, etc.
             val startDayOffset = monthCal.get(Calendar.DAY_OF_WEEK) - 1
             val daysInMonth = monthCal.getActualMaximum(Calendar.DAY_OF_MONTH)
             val totalCells = startDayOffset + daysInMonth
@@ -181,13 +183,15 @@ fun CalendarScreen(
                                 val isSelected = (currentYear == selectedYear && currentMonth == selectedMonth && dayNum == selectedDay)
                                 val dateKey = "$currentYear-$currentMonth-$dayNum"
                                 val dayLogs = logsByDate[dateKey] ?: emptyList()
-                                val hasLogs = dayLogs.isNotEmpty()
+                                val hasActiveLogs = dayLogs.any { it.deletedAt == null }
+                                val hasDeletedLogs = dayLogs.any { it.deletedAt != null }
 
                                 DayCell(
                                     day = dayNum,
                                     isToday = isToday,
                                     isSelected = isSelected,
-                                    hasLogs = hasLogs,
+                                    hasActiveLogs = hasActiveLogs,
+                                    hasDeletedLogs = hasDeletedLogs,
                                     onClick = {
                                         selectedYear = currentYear
                                         selectedMonth = currentMonth
@@ -250,26 +254,74 @@ fun CalendarScreen(
                         modifier = Modifier.fillMaxSize()
                     ) {
                         items(selectedDateLogs) { log ->
+                            val isDeleted = log.deletedAt != null
                             Card(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clickable { onLogClick(log.id) },
-                                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                                    .then(
+                                        if (!isDeleted) Modifier.clickable { onLogClick(log.id) }
+                                        else Modifier
+                                    ),
+                                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+                                colors = if (isDeleted) {
+                                    CardDefaults.cardColors(
+                                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                                    )
+                                } else CardDefaults.cardColors()
                             ) {
                                 Column(modifier = Modifier.padding(12.dp)) {
-                                    Text(
-                                        text = log.title,
-                                        style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.Bold
-                                    )
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = log.title,
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            modifier = Modifier.weight(1f)
+                                        )
+
+                                        if (isDeleted) {
+                                            Surface(
+                                                color = MaterialTheme.colorScheme.errorContainer,
+                                                shape = RoundedCornerShape(12.dp)
+                                            ) {
+                                                Text(
+                                                    text = "Recently Deleted",
+                                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = MaterialTheme.colorScheme.onErrorContainer
+                                                )
+                                            }
+                                        }
+                                    }
+
                                     val previewText = (log.blocks.firstOrNull { it is LogContentBlock.Text } as? LogContentBlock.Text)?.text ?: ""
                                     if (previewText.isNotEmpty()) {
+                                        Spacer(modifier = Modifier.height(4.dp))
                                         Text(
                                             text = previewText,
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            maxLines = 1
+                                            maxLines = 2
                                         )
+                                    }
+
+                                    if (isDeleted) {
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        OutlinedButton(
+                                            onClick = { viewModel.restoreLog(log) },
+                                            modifier = Modifier.align(Alignment.End)
+                                        ) {
+                                            Icon(
+                                                Icons.Default.Restore,
+                                                contentDescription = "Restore Log",
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("Restore", style = MaterialTheme.typography.labelMedium)
+                                        }
                                     }
                                 }
                             }
@@ -286,7 +338,8 @@ private fun DayCell(
     day: Int,
     isToday: Boolean,
     isSelected: Boolean,
-    hasLogs: Boolean,
+    hasActiveLogs: Boolean,
+    hasDeletedLogs: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -316,14 +369,26 @@ private fun DayCell(
                 color = if (isToday) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
             )
 
-            if (hasLogs) {
+            if (hasActiveLogs || hasDeletedLogs) {
                 Spacer(modifier = Modifier.height(2.dp))
-                Box(
-                    modifier = Modifier
-                        .size(6.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primary)
-                )
+                Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                    if (hasActiveLogs) {
+                        Box(
+                            modifier = Modifier
+                                .size(6.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.primary)
+                        )
+                    }
+                    if (hasDeletedLogs) {
+                        Box(
+                            modifier = Modifier
+                                .size(6.dp)
+                                .clip(CircleShape)
+                                .border(1.dp, MaterialTheme.colorScheme.error, CircleShape)
+                        )
+                    }
+                }
             }
         }
     }

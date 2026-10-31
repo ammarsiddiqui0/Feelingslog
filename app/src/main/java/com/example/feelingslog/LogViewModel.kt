@@ -10,15 +10,36 @@ import kotlinx.coroutines.launch
 
 class LogViewModel(private val repository: LogRepository) : ViewModel() {
     
-    // Subscribe to all logs from Room
+    // Subscribe to active logs from Room
     val logs: StateFlow<List<FeelingLog>> = repository.allLogs.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = emptyList()
     )
 
+    // Subscribe to active & soft-deleted logs for Calendar
+    val calendarLogs: StateFlow<List<FeelingLog>> = repository.allCalendarLogs.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = emptyList()
+    )
+
+    // Subscribe to soft-deleted logs for Recently Deleted
+    val deletedLogs: StateFlow<List<FeelingLog>> = repository.deletedLogs.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = emptyList()
+    )
+
     init {
+        cleanupExpiredLogs()
         seedDataIfEmpty()
+    }
+
+    fun cleanupExpiredLogs(thresholdMs: Long = 30 * 24 * 60 * 60 * 1000L) {
+        viewModelScope.launch {
+            repository.cleanupExpiredDeletedLogs(thresholdMs)
+        }
     }
 
     private fun seedDataIfEmpty() {
@@ -67,9 +88,21 @@ class LogViewModel(private val repository: LogRepository) : ViewModel() {
         saveLog(log.copy(title = title, blocks = updatedBlocks))
     }
 
-    fun deleteLog(log: FeelingLog) {
+    fun softDeleteLog(log: FeelingLog) {
         viewModelScope.launch {
-            repository.deleteLog(log)
+            repository.softDeleteLog(log)
+        }
+    }
+
+    fun restoreLog(log: FeelingLog) {
+        viewModelScope.launch {
+            repository.restoreLog(log)
+        }
+    }
+
+    fun permanentlyDeleteLog(log: FeelingLog) {
+        viewModelScope.launch {
+            repository.permanentlyDeleteLog(log)
         }
     }
 }

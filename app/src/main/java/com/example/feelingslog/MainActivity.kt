@@ -16,9 +16,13 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -33,8 +37,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        
-        // Manual "Dependency Injection" for the Repository
+
         val repository = LogRepository(applicationContext)
         val viewModelFactory = object : ViewModelProvider.Factory {
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
@@ -61,6 +64,20 @@ fun MainAppScreen(logViewModel: LogViewModel) {
 
     val mainTabs = listOf("home", "calendar", "settings")
     val showBottomBar = currentRoute in mainTabs
+
+    // Trigger cleanup when app returns to foreground (ON_START / ON_RESUME)
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME || event == Lifecycle.Event.ON_START) {
+                logViewModel.cleanupExpiredLogs()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
 
     Scaffold(
         bottomBar = {
@@ -105,7 +122,19 @@ fun MainAppScreen(logViewModel: LogViewModel) {
                 )
             }
             composable("settings") {
-                SettingsScreen()
+                SettingsScreen(
+                    onNavigateToRecentlyDeleted = {
+                        navController.navigate("recently_deleted")
+                    }
+                )
+            }
+            composable("recently_deleted") {
+                RecentlyDeletedScreen(
+                    viewModel = logViewModel,
+                    onNavigateBack = {
+                        navController.popBackStack()
+                    }
+                )
             }
             composable("editor/{logId}") { backStackEntry ->
                 val logId = backStackEntry.arguments?.getString("logId")

@@ -16,7 +16,8 @@ data class FeelingLog(
     val blocks: List<LogContentBlock> = emptyList(),
     val tags: List<String> = emptyList(),
     val createdAt: Long = System.currentTimeMillis(),
-    val updatedAt: Long = System.currentTimeMillis()
+    val updatedAt: Long = System.currentTimeMillis(),
+    val deletedAt: Long? = null
 )
 
 /**

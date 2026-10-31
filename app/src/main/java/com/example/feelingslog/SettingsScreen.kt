@@ -1,5 +1,6 @@
 package com.example.feelingslog
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
@@ -14,7 +15,9 @@ import androidx.compose.ui.unit.dp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen() {
+fun SettingsScreen(
+    onNavigateToRecentlyDeleted: () -> Unit = {}
+) {
     Scaffold(
         topBar = {
             TopAppBar(
@@ -101,7 +104,8 @@ fun SettingsScreen() {
                 SettingsRow(
                     icon = Icons.Outlined.DeleteSweep,
                     title = "Recently Deleted",
-                    subtitle = "Coming soon - Recover deleted logs"
+                    subtitle = "Manage & recover deleted logs (30-day window)",
+                    onClick = onNavigateToRecentlyDeleted
                 )
             }
 
@@ -159,10 +163,16 @@ private fun SettingsSectionHeader(title: String) {
 private fun SettingsRow(
     icon: ImageVector,
     title: String,
-    subtitle: String
+    subtitle: String,
+    onClick: (() -> Unit)? = null
 ) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(
+                if (onClick != null) Modifier.clickable(onClick = onClick)
+                else Modifier
+            ),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
         )
