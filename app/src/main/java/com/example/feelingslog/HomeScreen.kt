@@ -7,8 +7,6 @@ import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
 import androidx.compose.foundation.lazy.staggeredgrid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -23,7 +21,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 @Composable
 fun HomeScreen(
     onLogClick: (String) -> Unit,
-    onAddLogClick: () -> Unit,
+    onAddLogClick: () -> Unit = {},
     viewModel: LogViewModel = viewModel()
 ) {
     val logs by viewModel.logs.collectAsState()
@@ -37,11 +35,6 @@ fun HomeScreen(
                     titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
                 )
             )
-        },
-        floatingActionButton = {
-            FloatingActionButton(onClick = onAddLogClick) {
-                Icon(Icons.Default.Add, contentDescription = "Add Log")
-            }
         }
     ) { innerPadding ->
         // Masonry Grid
