@@ -31,17 +31,17 @@ fun CalendarScreen(
     onLogClick: (String) -> Unit,
     viewModel: LogViewModel = viewModel()
 ) {
-    // Consume calendarLogs to include both active and soft-deleted logs
-    val logs by viewModel.calendarLogs.collectAsState()
+    // Consume calendarLogsWithDetails to include both active and soft-deleted logs
+    val logsWithDetails by viewModel.calendarLogsWithDetails.collectAsState()
 
     // Map logs by date key "YYYY-MM-DD"
-    val logsByDate = remember(logs) {
-        val map = mutableMapOf<String, MutableList<FeelingLog>>()
+    val logsByDate = remember(logsWithDetails) {
+        val map = mutableMapOf<String, MutableList<FeelingLogWithDetails>>()
         val cal = Calendar.getInstance()
-        logs.forEach { log ->
-            cal.timeInMillis = log.createdAt
+        logsWithDetails.forEach { item ->
+            cal.timeInMillis = item.log.createdAt
             val key = "${cal.get(Calendar.YEAR)}-${cal.get(Calendar.MONTH)}-${cal.get(Calendar.DAY_OF_MONTH)}"
-            map.getOrPut(key) { mutableListOf() }.add(log)
+            map.getOrPut(key) { mutableListOf() }.add(item)
         }
         map
     }
@@ -183,8 +183,8 @@ fun CalendarScreen(
                                 val isSelected = (currentYear == selectedYear && currentMonth == selectedMonth && dayNum == selectedDay)
                                 val dateKey = "$currentYear-$currentMonth-$dayNum"
                                 val dayLogs = logsByDate[dateKey] ?: emptyList()
-                                val hasActiveLogs = dayLogs.any { it.deletedAt == null }
-                                val hasDeletedLogs = dayLogs.any { it.deletedAt != null }
+                                val hasActiveLogs = dayLogs.any { it.log.deletedAt == null }
+                                val hasDeletedLogs = dayLogs.any { it.log.deletedAt != null }
 
                                 DayCell(
                                     day = dayNum,
@@ -253,7 +253,8 @@ fun CalendarScreen(
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                         modifier = Modifier.fillMaxSize()
                     ) {
-                        items(selectedDateLogs) { log ->
+                        items(selectedDateLogs) { item ->
+                            val log = item.log
                             val isDeleted = log.deletedAt != null
                             Card(
                                 modifier = Modifier
@@ -297,7 +298,11 @@ fun CalendarScreen(
                                         }
                                     }
 
-                                    val previewText = (log.blocks.firstOrNull { it is LogContentBlock.Text } as? LogContentBlock.Text)?.text ?: ""
+                                    val previewText = item.contentItems
+                                        .filter { it.type == ContentType.TEXT }
+                                        .sortedBy { it.topLevelOrdinal ?: 0 }
+                                        .firstOrNull()?.textContent ?: ""
+
                                     if (previewText.isNotEmpty()) {
                                         Spacer(modifier = Modifier.height(4.dp))
                                         Text(

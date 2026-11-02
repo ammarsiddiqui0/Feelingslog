@@ -24,7 +24,7 @@ fun RecentlyDeletedScreen(
     onNavigateBack: () -> Unit,
     viewModel: LogViewModel = viewModel()
 ) {
-    val deletedLogs by viewModel.deletedLogs.collectAsState()
+    val deletedLogsWithDetails by viewModel.deletedLogsWithDetails.collectAsState()
     var logToPermanentlyDelete by remember { mutableStateOf<FeelingLog?>(null) }
     val dateFormatter = remember { SimpleDateFormat("MMM d, yyyy", Locale.getDefault()) }
 
@@ -44,7 +44,7 @@ fun RecentlyDeletedScreen(
             )
         }
     ) { innerPadding ->
-        if (deletedLogs.isEmpty()) {
+        if (deletedLogsWithDetails.isEmpty()) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -65,7 +65,8 @@ fun RecentlyDeletedScreen(
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                items(deletedLogs) { log ->
+                items(deletedLogsWithDetails) { item ->
+                    val log = item.log
                     val deletedAt = log.deletedAt ?: System.currentTimeMillis()
                     val daysElapsed = ((System.currentTimeMillis() - deletedAt) / (1000 * 60 * 60 * 24)).toInt()
                     val daysRemaining = maxOf(0, 30 - daysElapsed)
@@ -105,7 +106,11 @@ fun RecentlyDeletedScreen(
                                 }
                             }
 
-                            val previewText = (log.blocks.firstOrNull { it is LogContentBlock.Text } as? LogContentBlock.Text)?.text ?: ""
+                            val previewText = item.contentItems
+                                .filter { it.type == ContentType.TEXT }
+                                .sortedBy { it.topLevelOrdinal ?: 0 }
+                                .firstOrNull()?.textContent ?: ""
+
                             if (previewText.isNotEmpty()) {
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Text(
